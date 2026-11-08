@@ -1,242 +1,242 @@
 # AutoRecon-XSS
 
-Scanner de reconnaissance XSS autonome (Python) — réfléchi, stored, DOM, blind,
-upload et postMessage — avec **confirmation d'exécution réelle** via navigateur
-headless, PoC curl, et rapports JSON/CSV/Markdown.
+Standalone XSS reconnaissance scanner (Python) — reflected, stored, DOM, blind,
+upload and postMessage — with **real execution confirmation** via a headless
+browser, curl PoCs, and JSON/CSV/Markdown reports.
 
-> ⚠️ **Usage légal uniquement.** À n'exécuter que sur des applications dont vous
-> êtes propriétaire ou pour lesquelles vous disposez d'une **autorisation écrite**
-> (pentest avec périmètre, programme de bug bounty in-scope, environnement de
-> test / CTF comme Root-Me). Le flag `--yes` confirme que vous êtes autorisé.
+> ⚠️ **Authorized use only.** Run this only against applications you own or for
+> which you have **written authorization** (scoped pentest, in-scope bug bounty
+> program, test/CTF environment such as Root-Me). The `--yes` flag confirms you
+> are authorized.
 
 ---
 
 ## Installation
 
 ```bash
-# Cœur (obligatoire)
+# Core (required)
 pip install -r requirements.txt            # requests, beautifulsoup4
 
-# Optionnel : modes navigateur (--dom, --stored-dom, --postmessage)
+# Optional: browser modes (--dom, --stored-dom, --postmessage)
 pip install -r requirements-dom.txt
 playwright install chromium
 ```
 
 ---
 
-## Démarrage rapide
+## Quick start
 
-**Le plus simple — une URL + `--all` :**
+**Simplest — a URL + `--all`:**
 ```bash
-python autorecon_xss.py https://cible.io/ --all --yes
+python autorecon_xss.py https://target.io/ --all --yes
 ```
-`--all` active tous les modes automatiques (stored, stored-dom, dom, upload,
-postMessage, headers, path) **et** charge les corpus de payloads. L'URL peut être
-donnée en positionnel (ci-dessus) ou avec `-u/--url`. Les fichiers `payloads/`
-sont trouvés automatiquement, quel que soit le dossier courant.
+`--all` enables every automatic mode (stored, stored-dom, dom, upload,
+postMessage, headers, path) **and** loads the payload corpora. The URL can be
+passed positionally (above) or with `-u/--url`. The `payloads/` files are found
+automatically, regardless of the current directory.
 
 ```bash
-# Avec périmètre, rapport Markdown, et rate-limit (recommandé en bug bounty)
-python autorecon_xss.py https://cible.io/ --all \
-  --scope 'cible\.io$' --delay 0.3 --format md -o reports/cible.md --yes
+# With scope, Markdown report, and rate-limit (recommended for bug bounty)
+python autorecon_xss.py https://target.io/ --all \
+  --scope 'target\.io$' --delay 0.3 --format md -o reports/target.md --yes
 
-# Scan réfléchi minimal (rapide) sur une URL paramétrée
-python autorecon_xss.py "https://cible.io/?q=test" --scope 'cible\.io$' --yes
+# Minimal reflected scan (fast) on a parameterized URL
+python autorecon_xss.py "https://target.io/?q=test" --scope 'target\.io$' --yes
 ```
 
-> `--all` n'allume pas `--wayback` ni `--blind` (ils nécessitent un choix :
-> volume d'archives / collecteur externe). Ajoute-les au besoin.
+> `--all` does not turn on `--wayback` or `--blind` (they require a choice:
+> archive volume / external collector). Add them when needed.
 
 ---
 
-## Les familles de XSS et le flag qui les vise
+## XSS families and the flag that targets them
 
-| Classe de vulnérabilité | Comment | Flag |
+| Vulnerability class | How | Flag |
 |---|---|---|
-| **Réfléchie** (serveur) | input renvoyé dans la réponse immédiate | *(défaut)* |
-| **Stored / second-ordre** | injecté ici, ressort sur une autre page | `--stored` |
-| **DOM** (sink navigable) | `?param=`/`#hash` → sink client | `--dom` (`--dom-hash`) |
+| **Reflected** (server) | input echoed in the immediate response | *(default)* |
+| **Stored / second-order** | injected here, surfaces on another page | `--stored` |
+| **DOM** (client sink) | `?param=`/`#hash` → client sink | `--dom` (`--dom-hash`) |
 | **Stored-DOM** | login/JSON → API → `innerHTML` | `--stored-dom` |
-| **Blind** (out-of-band) | ressort dans un back-office invisible | `--blind <collecteur>` |
-| **Upload** | SVG/HTML servi inline exécutable | `--upload` |
+| **Blind** (out-of-band) | surfaces in an invisible back-office | `--blind <collector>` |
+| **Upload** | SVG/HTML served inline and executable | `--upload` |
 | **postMessage** | `window.postMessage` → sink | `--postmessage` |
-| **Mutation (mXSS)** | survit au filtre, mute à l'affichage | `--payloads payloads/mutation.txt` |
-| **Injection JSON** | formulaire soumis en `application/json` | *(auto-détecté)* |
+| **Mutation (mXSS)** | survives the filter, mutates on render | `--payloads payloads/mutation.txt` |
+| **JSON injection** | form submitted as `application/json` | *(auto-detected)* |
 
-> **Hors de portée automatique** (irréductiblement manuel) : les chaînes
-> logiques — self-XSS → login-CSRF → bot, DOM clobbering, race conditions,
-> escalade vers RCE. Le scanner vous dit **où** et **que ça exécute** ;
-> l'assemblage de l'exploit reste votre travail.
+> **Out of automatic reach** (irreducibly manual): logic chains — self-XSS →
+> login-CSRF → bot, DOM clobbering, race conditions, escalation to RCE. The
+> scanner tells you **where** and **that it executes**; assembling the exploit
+> remains your job.
 
 ---
 
-## Surface d'attaque (découverte des points d'injection)
+## Attack surface (injection point discovery)
 
 | Source | Flag |
 |---|---|
-| Crawl même-origine (liens + formulaires) | *(défaut)*, `-p/--pages N` |
-| Amorçage robots.txt / sitemap.xml | `--sitemap` |
-| Liste d'URLs externe (gau, katana…) | `-l urls.txt` |
-| URLs historiques Wayback Machine | `--wayback` (`--wayback-subdomains`, `--wayback-limit`) |
-| En-têtes réfléchis (Referer, User-Agent) | `--headers` |
-| Segments de path (REST-like) | `--path` |
-| Paramètres manuels (absents du HTML) | `--param name,q,search` (`--param-method`) |
-| Ne pas crawler (tester liste/URL seule) | `--no-crawl` |
+| Same-origin crawl (links + forms) | *(default)*, `-p/--pages N` |
+| robots.txt / sitemap.xml seeding | `--sitemap` |
+| External URL list (gau, katana…) | `-l urls.txt` |
+| Wayback Machine historical URLs | `--wayback` (`--wayback-subdomains`, `--wayback-limit`) |
+| Reflected headers (Referer, User-Agent) | `--headers` |
+| Path segments (REST-like) | `--path` |
+| Manual parameters (absent from the HTML) | `--param name,q,search` (`--param-method`) |
+| No crawling (test a list/URL only) | `--no-crawl` |
 
-**Filtrage de périmètre** (important en bug bounty) :
-- `--scope 'regex'` — netloc autorisés. **Défaut : même origine.** Pour un port
-  non-standard, utiliser `--scope 'host\.domaine'` **sans `$`** (le port casse
-  l'ancre `$`).
-- `--include 'regex'` / `--exclude 'regex'` — garder / ignorer des URLs.
+**Scope filtering** (important in bug bounty):
+- `--scope 'regex'` — allowed netlocs. **Default: same origin.** For a
+  non-standard port, use `--scope 'host\.domain'` **without `$`** (the port
+  breaks the `$` anchor).
+- `--include 'regex'` / `--exclude 'regex'` — keep / drop URLs.
 
 ---
 
-## Corpus de payloads
+## Payload corpora
 
-Fichiers dans `payloads/`, rechargeables :
+Files in `payloads/`, reloadable:
 
-| Fichier | Mode | Jeton |
+| File | Mode | Token |
 |---|---|---|
-| `bypass.txt` | réfléchi/stored : `--payloads` | `PROBE` |
-| `mutation.txt` | réfléchi/stored (mXSS) : `--payloads` | `PROBE` |
-| `dom.txt` | exécution : `--dom-payloads` | `TOKEN`, `TOKENBT` |
-| `mutation-dom.txt` | exécution (mXSS) : `--dom-payloads` | `TOKEN`, `TOKENBT` |
+| `bypass.txt` | reflected/stored: `--payloads` | `PROBE` |
+| `mutation.txt` | reflected/stored (mXSS): `--payloads` | `PROBE` |
+| `dom.txt` | execution: `--dom-payloads` | `TOKEN`, `TOKENBT` |
+| `mutation-dom.txt` | execution (mXSS): `--dom-payloads` | `TOKEN`, `TOKENBT` |
 
-- `PROBE` → marqueur aléatoire traçable (détection par écho).
-- `TOKEN` → `window.__arxcb('<marqueur>')` (appel du callback instrumenté).
-- `TOKENBT` → forme sans parenthèses (filtres bloquant `()`).
-- Format reflected : `payload<TAB>contexts` (html-body, tag, attribute,
-  javascript, html-comment). Format DOM : un payload par ligne contenant `TOKEN`.
+- `PROBE` → random traceable marker (echo-based detection).
+- `TOKEN` → `window.__arxcb('<marker>')` (invokes the instrumented callback).
+- `TOKENBT` → parenthesis-free form (filters blocking `()`).
+- Reflected format: `payload<TAB>contexts` (html-body, tag, attribute,
+  javascript, html-comment). DOM format: one payload per line containing `TOKEN`.
 
 ```bash
-# Combiner plusieurs corpus
+# Combine several corpora
 cat payloads/bypass.txt payloads/mutation.txt > payloads/all.txt
-python autorecon_xss.py -u "https://app.cible.io/" --stored \
-  --payloads payloads/all.txt --scope 'cible\.io$' --yes
+python autorecon_xss.py -u "https://app.target.io/" --stored \
+  --payloads payloads/all.txt --scope 'target\.io$' --yes
 ```
 
 ---
 
 ## Blind XSS (out-of-band)
 
-Injecte dans tous les points + en-têtes des sondes qui rappellent votre
-collecteur (Interactsh, XSS Hunter, votre domaine). Chaque point reçoit un
-sous-domaine unique ; la correspondance est écrite dans `blind_map.json`.
+Injects into every point + headers probes that call back to your collector
+(Interactsh, XSS Hunter, your own domain). Each point gets a unique subdomain;
+the mapping is written to `blind_map.json`.
 
 ```bash
-# interactsh-client vous donne un domaine type xxxx.oast.pro
-python autorecon_xss.py -u "https://app.cible.io/" \
-  --blind "xxxx.oast.pro" --scope 'cible\.io$' --delay 0.3 --yes
+# interactsh-client gives you a domain like xxxx.oast.pro
+python autorecon_xss.py -u "https://app.target.io/" \
+  --blind "xxxx.oast.pro" --scope 'target\.io$' --delay 0.3 --yes
 ```
-Un hit depuis `x7.xxxx.oast.pro` → cherchez `x7` dans `blind_map.json` pour
-savoir quel point a exécuté. Sondes **bénignes** (simple ping, pas d'exfiltration).
+A hit from `x7.xxxx.oast.pro` → look up `x7` in `blind_map.json` to find which
+point executed. Probes are **benign** (a plain ping, no exfiltration).
 
 ---
 
-## Confirmation d'exécution (navigateur headless)
+## Execution confirmation (headless browser)
 
-Les modes `--dom`, `--stored-dom`, `--postmessage` lancent Chromium (Playwright)
-et confirment l'exécution via un callback instrumenté (`window.__arxcb`). La
-détection couvre **toutes les frames** (y compris `<iframe srcdoc>`). Sondes
-bénignes : elles appellent notre callback, sans `alert` réel ni vol de données.
+The `--dom`, `--stored-dom`, `--postmessage` modes launch Chromium (Playwright)
+and confirm execution via an instrumented callback (`window.__arxcb`). Detection
+covers **all frames** (including `<iframe srcdoc>`). Benign probes: they call our
+callback, with no real `alert` or data theft.
 
 ```bash
-# DOM sur un param client
-python autorecon_xss.py -u "https://app.cible.io/page?content=x" --no-crawl \
-  --dom --dom-hash --scope 'cible\.io$' --yes
+# DOM on a client param
+python autorecon_xss.py -u "https://app.target.io/page?content=x" --no-crawl \
+  --dom --dom-hash --scope 'target\.io$' --yes
 
-# Stored-DOM : injecte via login puis observe les pages dans le navigateur
-python autorecon_xss.py -u "https://app.cible.io/login" --stored-dom \
-  --scope 'cible\.io$' --yes
+# Stored-DOM: inject via login then observe pages in the browser
+python autorecon_xss.py -u "https://app.target.io/login" --stored-dom \
+  --scope 'target\.io$' --yes
 
-# Fuzzing postMessage
-python autorecon_xss.py -u "https://app.cible.io/" --postmessage \
-  --scope 'cible\.io$' --yes
+# postMessage fuzzing
+python autorecon_xss.py -u "https://app.target.io/" --postmessage \
+  --scope 'target\.io$' --yes
 ```
 
 ---
 
-## Réseau, débit, authentification
+## Network, rate, authentication
 
-| Besoin | Flag |
+| Need | Flag |
 |---|---|
-| Session authentifiée | `--cookies "session=..."` |
-| En-tête personnalisé (répétable) | `--add-header 'X-Api-Key: ...'` |
+| Authenticated session | `--cookies "session=..."` |
+| Custom header (repeatable) | `--add-header 'X-Api-Key: ...'` |
 | Proxy (Burp) | `--proxy http://127.0.0.1:8080` |
-| Rate-limit (politesse / règles du programme) | `--delay 0.3` |
-| Threads de scan | `-t 4` |
-| Retries réseau | `--retries 2` |
-| **Budget global de requêtes** (garde-fou anti-emballement) | `--max-requests 20000` |
-| **Plafond pages d'observation** (stored/stored-dom/postMessage) | `--stored-limit 30` *(défaut)* |
-| Ignorer la vérif TLS | `--insecure` |
+| Rate-limit (politeness / program rules) | `--delay 0.3` |
+| Scan threads | `-t 4` |
+| Network retries | `--retries 2` |
+| **Global request budget** (anti-runaway guardrail) | `--max-requests 20000` |
+| **Observation-page cap** (stored/stored-dom/postMessage) | `--stored-limit 30` *(default)* |
+| Skip TLS verification | `--insecure` |
 
-> **Garde-fous** : les modes « observation de pages » (stored, stored-dom,
-> postMessage) testent `points × pages`, ce qui peut exploser sur un gros site.
-> `--stored-limit` plafonne les pages observées (défaut 30) et `--max-requests`
-> arrête proprement le scan au-delà d'un budget. Sur une cible où le programme
-> impose un faible débit, combinez `--delay`, `-t 1` et `--max-requests`.
+> **Guardrails**: the "page observation" modes (stored, stored-dom,
+> postMessage) test `points × pages`, which can explode on a large site.
+> `--stored-limit` caps the observed pages (default 30) and `--max-requests`
+> stops the scan cleanly past a budget. On a target where the program enforces a
+> low rate, combine `--delay`, `-t 1` and `--max-requests`.
 
 ---
 
-## Rapports
+## Reports
 
 ```bash
 --format json   # machine (jq)
---format csv    # tableur
---format md     # Markdown prêt pour un writeup HackerOne (+ section PoC curl)
--o rapport.md
+--format csv    # spreadsheet
+--format md     # Markdown ready for a HackerOne writeup (+ curl PoC section)
+-o report.md
 ```
-Chaque finding exploitable embarque une **PoC curl** reproductible et l'info
-**CSP** (qui conditionne l'exploitabilité réelle). Les barres de progression
-(crawl / réfléchi / DOM / stored / upload / postMessage) s'affichent sur stderr
-(elles ne polluent pas le rapport redirigé).
+Each exploitable finding ships a reproducible **curl PoC** and the **CSP** info
+(which governs real exploitability). The progress bars (crawl / reflected / DOM
+/ stored / upload / postMessage) print to stderr (they don't pollute a
+redirected report).
 
 ---
 
-## Exemple « tout activé » (cible autorisée)
+## "Everything on" example (authorized target)
 
 ```bash
-python autorecon_xss.py -u "https://app.cible.io/" \
+python autorecon_xss.py -u "https://app.target.io/" \
   --wayback --wayback-subdomains --path --headers \
   --stored --stored-dom --upload --postmessage \
   --dom --dom-hash --dom-payloads payloads/mutation-dom.txt \
   --payloads payloads/all.txt \
   --blind "xxxx.oast.pro" \
-  --cookies "session=..." --scope 'cible\.io$' \
-  --delay 0.3 --threads 4 --format md -o rapport.md --yes
+  --cookies "session=..." --scope 'target\.io$' \
+  --delay 0.3 --threads 4 --format md -o report.md --yes
 ```
 
 ---
 
-## Workflow bug bounty recommandé
+## Recommended bug bounty workflow
 
 ```bash
-# 1. Surface : collecte d'URLs (outils externes)
-subfinder -d cible.io -all -silent | httpx -silent > live.txt
+# 1. Surface: URL collection (external tools)
+subfinder -d target.io -all -silent | httpx -silent > live.txt
 cat live.txt | gau --subs > all_urls.txt
 cat all_urls.txt | grep '=' | uro > params.txt
 
-# 2. Détection réfléchie + stored sur la surface
-python autorecon_xss.py -u "https://cible.io/" --no-crawl -l params.txt \
+# 2. Reflected + stored detection over the surface
+python autorecon_xss.py -u "https://target.io/" --no-crawl -l params.txt \
   --stored --payloads payloads/all.txt \
-  --scope 'cible\.io$' --delay 0.3 --format json -o scan.json --yes
+  --scope 'target\.io$' --delay 0.3 --format json -o scan.json --yes
 
-# 3. Confirmation DOM sur les points chauds
+# 3. DOM confirmation on the hot points
 jq -r '.[]|select(.severity=="high" or .severity=="medium")|.url' scan.json \
   | sort -u > hot.txt
-python autorecon_xss.py -u "https://cible.io/" --no-crawl -l hot.txt \
-  --dom --dom-hash --scope 'cible\.io$' --delay 0.3 --yes
+python autorecon_xss.py -u "https://target.io/" --no-crawl -l hot.txt \
+  --dom --dom-hash --scope 'target\.io$' --delay 0.3 --yes
 ```
 
 ---
 
-## Limites (honnêtes)
+## Limits (honest)
 
-- **Aucun scanner ne détecte « tout ».** Prouver l'absence de XSS est
-  indécidable. Cet outil maximise la couverture du **détectable automatiquement**.
-- Les **chaînes logiques** (CSRF, clobbering, race, RCE) sont manuelles.
-- Le blind et les modes navigateur nécessitent respectivement un collecteur et
-  Chromium.
-- `--postmessage` envoie same-origin : un handler exigeant une origine tierce
-  précise peut échapper.
-- Respectez les règles de débit du programme (`--delay`, peu de threads).
+- **No scanner detects "everything."** Proving the absence of XSS is
+  undecidable. This tool maximizes coverage of what is **automatically
+  detectable**.
+- **Logic chains** (CSRF, clobbering, race, RCE) are manual.
+- Blind and browser modes require a collector and Chromium respectively.
+- `--postmessage` sends same-origin: a handler requiring a specific third-party
+  origin may slip through.
+- Respect the program's rate rules (`--delay`, few threads).
