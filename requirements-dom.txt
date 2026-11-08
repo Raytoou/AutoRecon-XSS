@@ -1,0 +1,7 @@
+# AutoRecon-XSS — dépendances optionnelles pour le scan DOM XSS (--dom)
+# Installe le cœur d'abord, puis ceci, puis le navigateur :
+#   pip install -r requirements.txt
+#   pip install -r requirements-dom.txt
+#   playwright install chromium
+-r requirements.txt
+playwright>=1.40

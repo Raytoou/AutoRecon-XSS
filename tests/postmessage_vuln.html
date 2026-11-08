@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>postMessage vuln (test local)</title></head>
+<body>
+<h1>postMessage sink de test</h1>
+<div id="out"></div>
+<script>
+  // Handler VULNERABLE : pas de vérif event.origin, et data -> innerHTML.
+  // Accepte data.html, data.message, ou une string brute.
+  window.addEventListener("message", function (e) {
+    var d = e.data;
+    var html = (d && (d.html || d.message || d.content)) || (typeof d === "string" ? d : "");
+    document.getElementById("out").innerHTML = html;
+  });
+</script>
+</body>
+</html>

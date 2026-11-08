@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# AutoRecon-XSS — artefacts générés (ne pas committer)
+blind_map.json
+reports/
+*.report.json
+*.report.csv
+*.report.md
+
+# Sorties de recon / wordlists générées (contiennent des URLs de cibles — NE PAS committer)
+live.txt
+subs.txt
+all_urls.txt
+params.txt
+safe_params.txt
+raw.txt
+hot.txt
+scan*.json
+arjun_params.txt
+inscope_params_raw.txt
+# Rapports / findings / listes de cibles nominatives
+*.report.md
+arc*.json
+priority.txt
+ch*.md
+*.findings.json
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

